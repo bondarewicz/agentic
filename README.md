@@ -22,7 +22,7 @@ Open `agentic.sln` in Rider to see both projects. `dotnet test agentic.sln` runs
 | `routing` | Workflow: routing | `Routing.cs` | Structured-output classifier picks a specialist prompt and a model size |
 | `parallel` | Workflow: parallelization | `Parallelization.cs` | `Task.WhenAll` for sectioning, majority count for voting |
 | `orchestrator` | Workflow: orchestrator-workers | `OrchestratorWorkers.cs` | The model decides the subtasks; code fans them out and the model merges |
-| `evaluator` | Workflow: evaluator-optimizer | `EvaluatorOptimizer.cs` | Generate, grade against written criteria, feed the feedback back, stop on pass or round limit |
+| `evaluator` | Workflow: evaluator-optimizer | `EvaluatorOptimizer.cs` | Writes a commit message for a diff. Code checks the Conventional Commits format first, then Claude grades the judgement criteria, and the feedback loops back until it passes or hits the round limit |
 | `agent` | Agents | `Agent.cs` | Fixes a seeded invoice project until its tests pass: runs the tests, reads the failure, edits with your approval, repeats. Review the files in the gitignored `workspace` folder |
 
 ## The shared helper

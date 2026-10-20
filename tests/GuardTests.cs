@@ -37,3 +37,20 @@ public class SeededWorkspaceTests
         Assert.Contains("All tests passed.", Agent.RunTests());
     }
 }
+
+public class CommitFormatTests
+{
+    [Theory]
+    [InlineData("fix: stop treating cut-off replies as complete\n\nWhy it matters.")]
+    [InlineData("fix(claude)!: stop treating cut-off replies as complete")]
+    public void Accepts_conventional_messages(string message) =>
+        Assert.Null(EvaluatorOptimizer.FormatProblem(message));
+
+    [Theory]
+    [InlineData("Fixed the bug")]
+    [InlineData("```\nfix: wrapped in a fence\n```")]
+    [InlineData("fix: this subject line is far too long to fit within the seventy two character limit")]
+    [InlineData("fix: no blank line\nbody starts here")]
+    public void Rejects_broken_messages(string message) =>
+        Assert.NotNull(EvaluatorOptimizer.FormatProblem(message));
+}
