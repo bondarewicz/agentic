@@ -2,31 +2,38 @@
   "profiles": {
     "augmented-llm": {
       "commandName": "Project",
-      "commandLineArgs": "augmented-llm"
+      "commandLineArgs": "augmented-llm",
+      "workingDirectory": "$(ProjectDir)"
     },
     "chaining": {
       "commandName": "Project",
-      "commandLineArgs": "chaining"
+      "commandLineArgs": "chaining",
+      "workingDirectory": "$(ProjectDir)"
     },
     "routing": {
       "commandName": "Project",
-      "commandLineArgs": "routing"
+      "commandLineArgs": "routing",
+      "workingDirectory": "$(ProjectDir)"
     },
     "parallel": {
       "commandName": "Project",
-      "commandLineArgs": "parallel"
+      "commandLineArgs": "parallel",
+      "workingDirectory": "$(ProjectDir)"
     },
     "orchestrator": {
       "commandName": "Project",
-      "commandLineArgs": "orchestrator"
+      "commandLineArgs": "orchestrator",
+      "workingDirectory": "$(ProjectDir)"
     },
     "evaluator": {
       "commandName": "Project",
-      "commandLineArgs": "evaluator"
+      "commandLineArgs": "evaluator",
+      "workingDirectory": "$(ProjectDir)"
     },
     "agent": {
       "commandName": "Project",
-      "commandLineArgs": "agent"
+      "commandLineArgs": "agent",
+      "workingDirectory": "$(ProjectDir)"
     }
   }
 }

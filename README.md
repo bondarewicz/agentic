@@ -23,7 +23,7 @@ Program.cs loads `.env` at startup; a key already exported in your shell takes p
 | `parallel` | Workflow: parallelization | `Parallelization.cs` | `Task.WhenAll` for sectioning, majority count for voting |
 | `orchestrator` | Workflow: orchestrator-workers | `OrchestratorWorkers.cs` | The model decides the subtasks; code fans them out and the model merges |
 | `evaluator` | Workflow: evaluator-optimizer | `EvaluatorOptimizer.cs` | Generate, grade against written criteria, feed the feedback back, stop on pass or round limit |
-| `agent` | Agents | `Agent.cs` | Tool loop over a sandboxed temp folder, human approval on every write, max step count |
+| `agent` | Agents | `Agent.cs` | Tool loop over the gitignored `workspace` folder (open it in Rider to review), human approval on every write, max step count |
 
 ## The shared helper
 

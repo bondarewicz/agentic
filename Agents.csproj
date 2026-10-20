@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <None Include=".env" Condition="Exists('.env')" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
-    <Compile Remove="tests/**" />
+    <Compile Remove="tests/**;workspace/**" />
     <InternalsVisibleTo Include="Tests" />
     <PackageReference Include="Anthropic" Version="12.58.0" />
   </ItemGroup>

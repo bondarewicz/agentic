@@ -3,7 +3,7 @@ public class GuardTests
     [Theory]
     [InlineData("../x")]
     [InlineData("/etc/passwd")]
-    [InlineData("../agents-workspace2/x")]
+    [InlineData("../workspace2/x")]
     public void Resolve_rejects_paths_outside_the_workspace(string path) =>
         Assert.Throws<ArgumentException>(() => Agent.Resolve(path));
 
