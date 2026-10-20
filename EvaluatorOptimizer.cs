@@ -1,9 +1,11 @@
 using System.Text.RegularExpressions;
 
 // Evaluator-optimizer: a commit message has clear rules, some checkable by code and some needing judgement, and it measurably improves with specific feedback.
-static partial class EvaluatorOptimizer
+namespace Agents;
+
+internal static partial class EvaluatorOptimizer
 {
-    record Verdict(bool Pass, string Feedback);
+    private record Verdict(bool Pass, string Feedback);
 
     private const string Diff = """
         diff --git a/Claude.cs b/Claude.cs
@@ -38,7 +40,8 @@ static partial class EvaluatorOptimizer
             if (feedback is null)
             {
                 var verdict = await Claude.AskJson<Verdict>(
-                    $"You are a demanding code reviewer. Evaluate this commit message for the diff. Pass only if every criterion holds.\n{Criteria}\n\nDiff:\n{Diff}\n\nMessage:\n{message}");
+                    $"You are a demanding code reviewer. Evaluate this commit message for the diff. Pass only if every criterion holds.\n{Criteria}\n\nDiff:\n{Diff}\n\nMessage:\n{message}"
+                );
                 if (verdict.Pass)
                 {
                     Console.WriteLine("Reviewer: PASS");

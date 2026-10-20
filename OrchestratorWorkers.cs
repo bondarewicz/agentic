@@ -1,9 +1,12 @@
 // Orchestrator-workers: the brief's sections can't be known in advance, so the model plans them instead of the code.
-static class OrchestratorWorkers
-{
-    record Plan(Subtask[] Subtasks);
 
-    record Subtask(string Title, string Instructions);
+namespace Agents;
+
+internal static class OrchestratorWorkers
+{
+    private record Plan(Subtask[] Subtasks);
+
+    private record Subtask(string Title, string Instructions);
 
     public static async Task Run()
     {
@@ -12,7 +15,8 @@ static class OrchestratorWorkers
         Console.WriteLine($"Task:\n{task}");
 
         var plan = await Claude.AskJson<Plan>(
-            $"Break this task into 2-4 independent sections a writer could draft separately. Give each precise instructions.\n\nTask: {task}");
+            $"Break this task into 2-4 independent sections a writer could draft separately. Give each precise instructions.\n\nTask: {task}"
+        );
         if (plan.Subtasks.Length == 0)
             throw new InvalidOperationException("Orchestrator produced no subtasks.");
         Console.WriteLine("Plan:");

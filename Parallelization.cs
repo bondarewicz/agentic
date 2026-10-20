@@ -1,7 +1,10 @@
 // Parallelization: security, speed and readability are independent checks (sectioning), and a yes/no vulnerability call is more reliable as a majority vote.
-static class Parallelization
+
+namespace Agents;
+
+internal static class Parallelization
 {
-    const string Code = """
+    private const string Code = """
         public User? FindUser(string name)
         {
             var sql = "SELECT * FROM Users WHERE Name = '" + name + "'";
@@ -11,19 +14,19 @@ static class Parallelization
         }
         """;
 
-    const string SafeCode = """
-        public User? FindUser(string name) 
+    private const string SafeCode = """
+        public User? FindUser(string name)
         {
             using var cmd = new SqlCommand("SELECT Id, Name, Email FROM Users WHERE Name = @name", _connection);
-            cmd.Parameters.Add("@name", SqlDbType.NVarChar, 100).Value = name;                                                                        
+            cmd.Parameters.Add("@name", SqlDbType.NVarChar, 100).Value = name;
             using var reader = cmd.ExecuteReader();
             return reader.Read() ? Map(reader) : null;
         }
         """;
 
-    static readonly string CodeToReview = Code;
+    private static readonly string CodeToReview = Code;
 
-    record Vote(bool Vulnerable, string Reason);
+    private record Vote(bool Vulnerable, string Reason);
 
     public static async Task Run()
     {
@@ -41,7 +44,8 @@ static class Parallelization
                 .Range(0, 3)
                 .Select(_ =>
                     Claude.AskJson<Vote>(
-                        $"Does this code contain a security vulnerability?\n\n{CodeToReview}")
+                        $"Does this code contain a security vulnerability?\n\n{CodeToReview}"
+                    )
                 )
         );
         var yes = votes.Count(v => v.Vulnerable);

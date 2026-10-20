@@ -1,3 +1,5 @@
+using Agents;
+
 var envFile = Path.Combine(AppContext.BaseDirectory, ".env");
 if (File.Exists(envFile))
     foreach (var (key, value) in DotEnv.Parse(File.ReadLines(envFile)))
@@ -6,11 +8,7 @@ if (File.Exists(envFile))
 
 var examples = new (string Name, string What, Func<Task> Run)[]
 {
-    (
-        "augmented-llm",
-        "Building block: an LLM with retrieval, tools and memory",
-        AugmentedLlm.Run
-    ),
+    ("augmented-llm", "Building block: an LLM with retrieval, tools and memory", AugmentedLlm.Run),
     ("chaining", "Workflow: prompt chaining with a programmatic gate", PromptChaining.Run),
     ("routing", "Workflow: classify, then dispatch to a specialist prompt and model", Routing.Run),
     ("parallel", "Workflow: parallelization, sectioning and voting", Parallelization.Run),
@@ -19,7 +17,11 @@ var examples = new (string Name, string What, Func<Task> Run)[]
         "Workflow: orchestrator plans, workers execute, orchestrator merges",
         OrchestratorWorkers.Run
     ),
-    ("evaluator", "Workflow: generate, evaluate, refine until it passes", EvaluatorOptimizer.Run),
+    (
+        "evaluator",
+        "Workflow: generate, evaluate, refine until it passes",
+        Agents.EvaluatorOptimizer.Run
+    ),
     ("agent", "Agent: kitchen assistant that orders missing stock with your approval", Agent.Run),
 };
 
@@ -45,14 +47,20 @@ finally
 }
 return 0;
 
-static class DotEnv
+namespace Agents
 {
-    public static IEnumerable<(string Key, string Value)> Parse(IEnumerable<string> lines)
+    internal static class DotEnv
     {
-        return from line in lines
-            select line.Split('=', 2) into kv
-            where kv.Length == 2 && !kv[0].TrimStart().StartsWith('#')
-            let key = kv[0].Trim()
-            select (key.StartsWith("export ") ? key[7..].TrimStart() : key, kv[1].Trim().Trim('"', '\''));
+        public static IEnumerable<(string Key, string Value)> Parse(IEnumerable<string> lines)
+        {
+            return from line in lines
+                select line.Split('=', 2) into kv
+                where kv.Length == 2 && !kv[0].TrimStart().StartsWith('#')
+                let key = kv[0].Trim()
+                select (
+                    key.StartsWith("export ") ? key[7..].TrimStart() : key,
+                    kv[1].Trim().Trim('"', '\'')
+                );
+        }
     }
 }

@@ -14,7 +14,7 @@ dotnet run --no-launch-profile   # list the examples; plain `dotnet run` starts 
 
 Program.cs loads `.env` at startup; a key already exported in your shell takes precedence. Each run ends with a line of calls, tokens and estimated cost. In Rider, every example is a launch profile in the run dropdown.
 
-Open `agentic.sln` in Rider to see both projects. Because the solution and the project share a folder, build with `dotnet build agentic.sln`. `dotnet test agentic.sln` runs the offline tests: the `.env` parser, the commit message format check, and the agent's stock check, ordering and workspace guard.
+Open `agentic.sln` in Rider to see both projects. Because the solution and the project share a folder, build with `dotnet build agentic.sln`. `dotnet test agentic.sln` runs the offline tests: the `.env` parser, the commit message format check, and the agent's stock check, ordering and workspace guard. Code is formatted with CSharpier, pinned in the tool manifest: run `dotnet tool restore`, then `dotnet csharpier format .`.
 
 | Example | Article section | File | What to look at |
 |---|---|---|---|

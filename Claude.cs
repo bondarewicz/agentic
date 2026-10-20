@@ -5,13 +5,16 @@ using System.Text.Json.Serialization.Metadata;
 using Anthropic;
 using Anthropic.Models.Messages;
 
-static class Claude
+namespace Agents;
+
+internal static class Claude
 {
     public const string Opus = "claude-opus-5-5";
     public const string Haiku = "claude-haiku-5-5";
 
-    static readonly AnthropicClient Client = new();
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    private static readonly AnthropicClient Client = new();
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         RespectRequiredConstructorParameters = true,
@@ -21,22 +24,25 @@ static class Claude
     };
 
     // shortcut: USD per million tokens copied from the October 2026 price list, update when pricing changes.
-    static readonly Dictionary<string, (decimal Input, decimal Output)> Prices = new()
+    private static readonly Dictionary<string, (decimal Input, decimal Output)> Prices = new()
     {
         [Opus] = (4m, 20m),
         [Haiku] = (0.10m, 0.50m),
     };
-    static readonly Lock Gate = new();
-    static int calls;
-    static long inputTokens,
+
+    private static readonly Lock Gate = new();
+    private static int calls;
+
+    private static long inputTokens,
         outputTokens;
-    static decimal cost;
-    static bool unpriced;
+
+    private static decimal cost;
+    private static bool unpriced;
 
     public static string UsageSummary() =>
         $"{calls} calls, {inputTokens:N0} input tokens, {outputTokens:N0} output tokens, about ${cost:F4}{(unpriced ? " (excludes unpriced models)" : "")}";
 
-    static async Task<Message> Create(string model, MessageCreateParams p)
+    private static async Task<Message> Create(string model, MessageCreateParams p)
     {
         var response = await Client.Messages.Create(p);
         var (input, output) = (response.Usage.InputTokens, response.Usage.OutputTokens);
@@ -122,7 +128,7 @@ static class Claude
             messages.Add(
                 new() { Role = Role.Assistant, Content = response.Content.Select(ToParam).ToList() }
             );
-            if (response.StopReason != "tool_use")
+            if (response.StopReason != StopReason.ToolUse)
                 return Text(response);
 
             List<ContentBlockParam> results =
@@ -137,7 +143,7 @@ static class Claude
         throw new InvalidOperationException($"Did not finish within {maxSteps} steps.");
     }
 
-    static ContentBlockParam ToParam(ContentBlock block) =>
+    private static ContentBlockParam ToParam(ContentBlock block) =>
         block.Value switch
         {
             TextBlock t => new TextBlockParam { Text = t.Text },
@@ -158,7 +164,7 @@ static class Claude
             ),
         };
 
-    static ToolResultBlockParam RunTool(
+    private static ToolResultBlockParam RunTool(
         ToolUseBlock use,
         Func<ToolUseBlock, string> execute,
         int step
@@ -185,13 +191,13 @@ static class Claude
         }
     }
 
-    static string Shorten(string text)
+    private static string Shorten(string text)
     {
         text = text.Trim().ReplaceLineEndings(" | ");
         return text.Length > 120 ? text[..120] + "…" : text;
     }
 
-    static MessageCreateParams Params(
+    private static MessageCreateParams Params(
         string prompt,
         string? system,
         string model,
@@ -206,17 +212,17 @@ static class Claude
             Messages = [new() { Role = Role.User, Content = prompt }],
         };
 
-    static MessageCreateParamsSystem? Sys(string? system) =>
+    private static MessageCreateParamsSystem? Sys(string? system) =>
         system is null ? null : (MessageCreateParamsSystem)system;
 
-    static string Text(Message response)
+    private static string Text(Message response)
     {
-        if (response.StopReason == "refusal")
+        if (response.StopReason == StopReason.Refusal)
             throw new InvalidOperationException(
                 $"Claude refused: {response.StopDetails?.Explanation}"
             );
 
-        return response.StopReason == "max_tokens"
+        return response.StopReason == StopReason.MaxTokens
             ? throw new InvalidOperationException("Reply was cut off at the token limit.")
             : string.Concat(
                 response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text)
