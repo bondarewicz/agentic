@@ -87,7 +87,7 @@ static class Claude
 
     static ToolResultBlockParam RunTool(ToolUseBlock use, Func<ToolUseBlock, string> execute, int step)
     {
-        Console.WriteLine($"\n  [step {step}] Claude calls {use.Name}: {Shorten(string.Join(", ", use.Input.Select(kv => $"{kv.Key}={kv.Value}")))}");
+        Console.WriteLine($"\n  [step {step}] Claude tool {use.Name}: {Shorten(string.Join(", ", use.Input.Select(kv => $"{kv.Key}={kv.Value}")))}");
         try
         {
             var result = execute(use);
