@@ -87,10 +87,24 @@ static class Claude
 
     static ToolResultBlockParam RunTool(ToolUseBlock use, Func<ToolUseBlock, string> execute, int step)
     {
-        var input = JsonSerializer.Serialize(use.Input);
-        Console.WriteLine($"  [step {step}] {use.Name}({(input.Length > 120 ? input[..120] + "…" : input)})");
-        try { return new() { ToolUseID = use.ID, Content = execute(use) }; }
-        catch (Exception e) { return new() { ToolUseID = use.ID, Content = e.Message, IsError = true }; }
+        Console.WriteLine($"  [step {step}] {use.Name}({Shorten(JsonSerializer.Serialize(use.Input))})");
+        try
+        {
+            var result = execute(use);
+            Console.WriteLine($"           -> {Shorten(result)}");
+            return new() { ToolUseID = use.ID, Content = result };
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"           -> error: {Shorten(e.Message)}");
+            return new() { ToolUseID = use.ID, Content = e.Message, IsError = true };
+        }
+    }
+
+    static string Shorten(string text)
+    {
+        text = text.Trim().ReplaceLineEndings(" | ");
+        return text.Length > 120 ? text[..120] + "…" : text;
     }
 
     static MessageCreateParams Params(string prompt, string? system, string model, OutputConfig? outputConfig = null) => new()
