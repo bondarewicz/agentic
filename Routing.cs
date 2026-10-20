@@ -1,4 +1,4 @@
-// Routing: refunds, bugs and small talk need different prompts, and easy questions can go to a cheaper model.
+// Routing: bookings, menu questions and complaints each need different knowledge, and an easy question doesn't need the strongest model.
 static class Routing
 {
     record Route(string Category, string Difficulty, string Reason);
@@ -8,7 +8,7 @@ static class Routing
         type = "object",
         properties = new
         {
-            category = new { type = "string", @enum = new[] { "refund", "technical", "general" } },
+            category = new { type = "string", @enum = new[] { "booking", "menu", "complaint" } },
             difficulty = new { type = "string", @enum = new[] { "easy", "hard" } },
             reason = new { type = "string" },
         },
@@ -18,23 +18,24 @@ static class Routing
 
     static readonly Dictionary<string, string> Specialists = new()
     {
-        ["refund"] = "You are a billing specialist. Be precise about the refund policy: 30 days, original payment method, 5 business days to appear.",
-        ["technical"] = "You are a senior support engineer. Ask for logs or versions only if necessary; otherwise give concrete steps.",
-        ["general"] = "You are a friendly front-desk assistant. Opening hours are 9-17 Monday to Friday. Keep answers short.",
+        ["booking"] = "You are the host at Luigi's, a small pizzeria. Open Tuesday to Sunday, 12:00 to 22:00, closed Mondays. Tables seat 2, 4 or 6. Step-free entrance and an accessible toilet. Keep answers short and friendly.",
+        ["menu"] = "You are the chef at Luigi's. Menu and allergens: Margherita (gluten, milk), pesto pasta (gluten, milk, pine nuts, pesto made in-house), tiramisu (gluten, eggs, milk). The kitchen handles nuts, so traces are possible in any dish. Never guess about allergens.",
+        ["complaint"] = "You are the manager at Luigi's. Apologise once, sincerely. For a late or cold delivery, offer a full refund for the dish or a free replacement, and let the customer choose. Keep it short.",
     };
 
     public static async Task Run()
     {
         string[] inbox =
         [
-            "What are your opening hours?",
-            "I was charged twice for order #4411, I want my money back.",
-            "After upgrading to 3.2 the app crashes on startup with NullReferenceException in ConfigLoader. Worked fine on 3.1.",
+            "Are you open on Sunday?",
+            "Table for six on Friday at eight, please. One of us uses a wheelchair.",
+            "Is the pesto pasta safe for someone with a nut allergy?",
+            "My pizza arrived cold and an hour late.",
         ];
 
         foreach (var message in inbox)
         {
-            var route = await Claude.AskJson<Route>($"Classify this customer message.\n\n{message}", RouteSchema);
+            var route = await Claude.AskJson<Route>($"Classify this message to a pizzeria. Hard means a wrong answer could cause real harm or needs careful judgement.\n\n{message}", RouteSchema);
             var model = route.Difficulty == "easy" ? Claude.Haiku : Claude.Opus;
             Console.WriteLine($"\nMessage: {message}\n  -> {route.Category} / {route.Difficulty} via {model} ({route.Reason})");
 
