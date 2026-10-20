@@ -1,0 +1,32 @@
+{
+  "profiles": {
+    "augmented-llm": {
+      "commandName": "Project",
+      "commandLineArgs": "augmented-llm"
+    },
+    "chaining": {
+      "commandName": "Project",
+      "commandLineArgs": "chaining"
+    },
+    "routing": {
+      "commandName": "Project",
+      "commandLineArgs": "routing"
+    },
+    "parallel": {
+      "commandName": "Project",
+      "commandLineArgs": "parallel"
+    },
+    "orchestrator": {
+      "commandName": "Project",
+      "commandLineArgs": "orchestrator"
+    },
+    "evaluator": {
+      "commandName": "Project",
+      "commandLineArgs": "evaluator"
+    },
+    "agent": {
+      "commandName": "Project",
+      "commandLineArgs": "agent"
+    }
+  }
+}
