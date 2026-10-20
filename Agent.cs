@@ -1,7 +1,8 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Anthropic.Models.Messages;
 
-// Agent: how many files to read and when it is done can't be hardcoded, so the model drives the loop, with a human checkpoint and step cap as guardrails.
+// Agent: how many fix-and-test rounds it takes can't be known up front, so the model drives the loop; test output is the ground truth, and a human checkpoint and step cap are the guardrails.
 static class Agent
 {
     internal static readonly string Root = Path.GetFullPath("workspace");
@@ -11,20 +12,26 @@ static class Agent
         new()
         {
             Name = "list_files",
-            Description = "List all files in the workspace, as paths relative to the workspace root.",
+            Description = "List the source files in the workspace, as paths relative to the workspace root.",
             InputSchema = new() { Properties = new Dictionary<string, JsonElement>(), Required = [] },
         },
         new()
         {
             Name = "read_file",
-            Description = "Read a file. Path is relative to the workspace root, e.g. 'src/Program.cs'.",
+            Description = "Read a file. Path is relative to the workspace root, e.g. 'src/Invoice.cs'.",
             InputSchema = Schema("path"),
         },
         new()
         {
             Name = "write_file",
-            Description = "Create or overwrite a file. Path is relative to the workspace root. A human approves every write.",
+            Description = "Replace a file's whole content. Path is relative to the workspace root. Tests.cs is read-only. A human approves every write.",
             InputSchema = Schema("path", "content"),
+        },
+        new()
+        {
+            Name = "run_tests",
+            Description = "Build the workspace and run its tests. Stops at the first failing test and prints it, or prints build errors.",
+            InputSchema = new() { Properties = new Dictionary<string, JsonElement>(), Required = [] },
         },
     ];
 
@@ -35,30 +42,55 @@ static class Agent
 
         List<MessageParam> messages =
         [
-            new() { Role = Role.User, Content = "Create SUMMARY.md: one paragraph on what this project is, then a checklist of every TODO you find in the code. Read the file back after writing it to verify." },
+            new() { Role = Role.User, Content = "The tests in this project fail. Fix the code so every test passes. Do not change the tests." },
         ];
         var result = await Claude.ToolLoop(messages, Tools, Execute,
-            system: "You are a coding agent in a sandboxed workspace. Look before you act: list and read files before writing. When the task is complete, reply with a short summary of what you did.",
-            maxSteps: 15);
+            system: "You are a coding agent in a sandboxed workspace. Run the tests first, read the code the failure points to, make the smallest fix, and run the tests again after every change. Stop when all tests pass and summarise what you fixed.",
+            maxSteps: 20);
         Console.WriteLine($"\nAgent: {result}");
     }
 
     static string Execute(ToolUseBlock call) => call.Name switch
     {
-        "list_files" => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(Root, f))),
+        "list_files" => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(Root, f))
+            .Where(f => !f.StartsWith("bin") && !f.StartsWith("obj"))),
         "read_file" => File.ReadAllText(Resolve(call.Input["path"].GetString()!)),
         "write_file" => Write(call.Input["path"].GetString()!, call.Input["content"].GetString()!),
+        "run_tests" => RunTests(),
         _ => throw new ArgumentException($"Unknown tool {call.Name}"),
     };
 
     static string Write(string path, string content)
     {
         var full = Resolve(path);
+        if (Path.GetFileName(full) == "Tests.cs")
+            throw new ArgumentException("Tests.cs is read-only. Fix the code under src instead.");
         Console.WriteLine($"\n--- Agent wants to write {path} ---\n{content}\n--- Approve? [y/N] ");
         if (Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) != true)
             return "The user rejected this write. Explain what you intended and stop.";
         File.WriteAllText(full, content);
         return $"Wrote {content.Length} characters to {path}.";
+    }
+
+    internal static string RunTests()
+    {
+        using var process = Process.Start(new ProcessStartInfo("dotnet", "run -v q")
+        {
+            WorkingDirectory = Root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        })!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var errors = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(TimeSpan.FromMinutes(2)))
+        {
+            process.Kill(entireProcessTree: true);
+            return "Tests timed out after 2 minutes.";
+        }
+        var result = $"exit code {process.ExitCode}\n{output.Result}{errors.Result}";
+        Console.WriteLine(result);
+        return result;
     }
 
     internal static string Resolve(string relative)
@@ -75,12 +107,56 @@ static class Agent
         Required = [.. stringProps],
     };
 
-    static void SeedWorkspace()
+    internal static void SeedWorkspace()
     {
         if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true);
         Directory.CreateDirectory(Path.Combine(Root, "src"));
-        File.WriteAllText(Path.Combine(Root, "README.md"), "# Invoicer\nTiny CLI that turns a CSV of hours into a PDF invoice.\n");
-        File.WriteAllText(Path.Combine(Root, "src", "Program.cs"), "// TODO: read the CSV path from args instead of hardcoding\nvar rows = Csv.Load(\"hours.csv\");\n// TODO: handle an empty CSV\nPdf.Render(rows);\n");
-        File.WriteAllText(Path.Combine(Root, "src", "Pdf.cs"), "static class Pdf\n{\n    // TODO: add VAT line\n    public static void Render(IEnumerable<Row> rows) { }\n}\n");
+        File.WriteAllText(Path.Combine(Root, "Invoicer.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net10.0</TargetFramework>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(Path.Combine(Root, "src", "Invoice.cs"), """
+            using System.Globalization;
+
+            public record Line(string Description, decimal Hours, decimal Rate);
+
+            public static class Invoice
+            {
+                public const decimal VatRate = 0.23m;
+
+                public static List<Line> Parse(string csv) =>
+                    csv.Split('\n')
+                       .Skip(1)
+                       .Select(row => row.Split(','))
+                       .Select(c => new Line(c[0], decimal.Parse(c[1], CultureInfo.InvariantCulture), decimal.Parse(c[2], CultureInfo.InvariantCulture)))
+                       .ToList();
+
+                public static decimal Total(IEnumerable<Line> lines) =>
+                    lines.Sum(l => Math.Round(l.Hours * l.Rate * (1 + VatRate), 2));
+            }
+            """);
+        File.WriteAllText(Path.Combine(Root, "Tests.cs"), """
+            Equal("VAT total is rounded once, not per line", 193.68m, () => Invoice.Total(
+                [new("Design", 1.5m, 33.33m), new("Build", 2.25m, 41.10m), new("Review", 0.75m, 19.99m)]));
+            Equal("a trailing newline in the CSV is not a line", 1, () => Invoice.Parse("description,hours,rate\nDesign,2,100\n").Count);
+            Console.WriteLine("All tests passed.");
+
+            static void Equal<T>(string name, T expected, Func<T> actual)
+            {
+                try
+                {
+                    var value = actual();
+                    if (Equals(value, expected)) { Console.WriteLine($"PASS {name}"); return; }
+                    Console.WriteLine($"FAIL {name}: expected {expected}, got {value}");
+                }
+                catch (Exception e) { Console.WriteLine($"FAIL {name}: {e.GetType().Name}: {e.Message}"); }
+                Environment.Exit(1);
+            }
+            """);
     }
 }
