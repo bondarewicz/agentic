@@ -19,11 +19,13 @@ public class GuardTests
 
 public class SeededWorkspaceTests
 {
+    private static readonly string Root = Path.GetFullPath("workspace");
+
     [Fact]
     public void Seeded_kitchen_is_short_of_mozzarella_and_gorgonzola_only()
     {
-        if (Directory.Exists(Agent.Root))
-            Directory.Delete(Agent.Root, recursive: true);
+        if (Directory.Exists(Root))
+            Directory.Delete(Root, recursive: true);
         Agent.SeedWorkspace();
         Assert.Equal(
             "Short:\nmozzarella: 1800 g short\ngorgonzola: 500 g short",
@@ -34,32 +36,34 @@ public class SeededWorkspaceTests
     [Fact]
     public void Approved_order_updates_stock_and_sold_out_item_is_refused()
     {
-        if (Directory.Exists(Agent.Root))
-            Directory.Delete(Agent.Root, recursive: true);
+        if (Directory.Exists(Root))
+            Directory.Delete(Root, recursive: true);
         Agent.SeedWorkspace();
         Console.SetIn(new StringReader("y\n"));
 
-        Assert.Contains("sold out", Agent.PlaceOrder("Fresco", "gorgonzola", 1));
-        Assert.Contains("Ordered", Agent.PlaceOrder("Fresco", " Mozzarella ", 1));
+        Assert.Contains("sold out", Agent.PlaceOrder("Vistula Foods", "gorgonzola", 1));
+        Assert.Contains("Ordered", Agent.PlaceOrder("Vistula Foods", " Mozzarella ", 1));
         Assert.Equal("Short:\ngorgonzola: 500 g short", Agent.Shortages());
-        Assert.Throws<ArgumentException>(() => Agent.PlaceOrder("Fresco", "mozzarella cheese", 1));
+        Assert.Throws<ArgumentException>(() =>
+            Agent.PlaceOrder("Vistula Foods", "mozzarella cheese", 1)
+        );
     }
 
     [Fact]
     public void Refuses_to_delete_a_workspace_folder_it_did_not_create()
     {
-        if (Directory.Exists(Agent.Root))
-            Directory.Delete(Agent.Root, recursive: true);
-        Directory.CreateDirectory(Agent.Root);
-        File.WriteAllText(Path.Combine(Agent.Root, "keep.txt"), "someone's real file");
+        if (Directory.Exists(Root))
+            Directory.Delete(Root, recursive: true);
+        Directory.CreateDirectory(Root);
+        File.WriteAllText(Path.Combine(Root, "keep.txt"), "someone's real file");
         try
         {
             Assert.Throws<InvalidOperationException>(Agent.SeedWorkspace);
-            Assert.True(File.Exists(Path.Combine(Agent.Root, "keep.txt")));
+            Assert.True(File.Exists(Path.Combine(Root, "keep.txt")));
         }
         finally
         {
-            Directory.Delete(Agent.Root, recursive: true);
+            Directory.Delete(Root, recursive: true);
         }
     }
 }

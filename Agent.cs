@@ -14,10 +14,10 @@ internal static class Agent
         "suppliers.csv",
         "orders.csv",
     ];
-    private static readonly string[] Suppliers = ["Fresco", "Dairy Dan"];
+    private static readonly string[] Suppliers = ["Vistula Foods", "Kowalski Dairy"];
     private static readonly HashSet<(string Supplier, string Ingredient)> SoldOut =
     [
-        ("Fresco", "gorgonzola"),
+        ("Vistula Foods", "gorgonzola"),
     ];
 
     private static readonly List<Tool> Tools =
@@ -33,7 +33,7 @@ internal static class Agent
         ),
         Claude.DefineTool(
             "place_order",
-            "Order whole packs of an ingredient for delivery before service. Fresco is the usual supplier. Pack sizes are in suppliers.csv. A human approves every order.",
+            "Order whole packs of an ingredient for delivery before service. Vistula Foods is the usual supplier. Pack sizes are in suppliers.csv. A human approves every order.",
             ("supplier", new { type = "string", @enum = Suppliers }),
             ("ingredient", new { type = "string" }),
             ("packs", new { type = "integer", minimum = 1 })
@@ -169,7 +169,7 @@ internal static class Agent
         );
         File.WriteAllText(
             Path.Combine(Root, "suppliers.csv"),
-            "supplier,ingredient,pack_grams\nFresco,mozzarella,2500\nFresco,gorgonzola,1500\nDairy Dan,mozzarella,1000\nDairy Dan,gorgonzola,1000\n"
+            "supplier,ingredient,pack_grams\nVistula Foods,mozzarella,2500\nVistula Foods,gorgonzola,1500\nKowalski Dairy,mozzarella,1000\nKowalski Dairy,gorgonzola,1000\n"
         );
         File.WriteAllText(Path.Combine(Root, "orders.csv"), "supplier,ingredient,grams\n");
     }
