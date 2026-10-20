@@ -54,7 +54,7 @@ static class Agent
     {
         "list_files" => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(Root, f))
-            .Where(f => !f.StartsWith("bin") && !f.StartsWith("obj"))),
+            .Where(f => f.Split(Path.DirectorySeparatorChar)[0] is not ("bin" or "obj"))),
         "read_file" => File.ReadAllText(Resolve(call.Input["path"].GetString()!)),
         "write_file" => Write(call.Input["path"].GetString()!, call.Input["content"].GetString()!),
         "run_tests" => RunTests(),
@@ -109,7 +109,12 @@ static class Agent
 
     internal static void SeedWorkspace()
     {
-        if (Directory.Exists(Root)) Directory.Delete(Root, recursive: true);
+        if (Directory.Exists(Root))
+        {
+            if (!File.Exists(Path.Combine(Root, "Invoicer.csproj")))
+                throw new InvalidOperationException($"{Root} exists and is not the agent's workspace. Move or delete it, or run from the project folder.");
+            Directory.Delete(Root, recursive: true);
+        }
         Directory.CreateDirectory(Path.Combine(Root, "src"));
         File.WriteAllText(Path.Combine(Root, "Invoicer.csproj"), """
             <Project Sdk="Microsoft.NET.Sdk">

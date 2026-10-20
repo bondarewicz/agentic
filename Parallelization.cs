@@ -11,7 +11,7 @@ static class Parallelization
         }
         """;
 
-    const string AnotherCode = """
+    const string SafeCode = """
         public User? FindUser(string name) 
         {
             using var cmd = new SqlCommand("SELECT Id, Name, Email FROM Users WHERE Name = @name", _connection);
@@ -21,7 +21,7 @@ static class Parallelization
         }
         """;
 
-    private static string CodeToReview = Code;
+    static readonly string CodeToReview = Code;
 
     record Vote(bool Vulnerable, string Reason);
 

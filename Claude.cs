@@ -16,9 +16,10 @@ static class Claude
     static int calls;
     static long inputTokens, outputTokens;
     static decimal cost;
+    static bool unpriced;
 
     public static string UsageSummary() =>
-        $"{calls} calls, {inputTokens:N0} input tokens, {outputTokens:N0} output tokens, about ${cost:F4}";
+        $"{calls} calls, {inputTokens:N0} input tokens, {outputTokens:N0} output tokens, about ${cost:F4}{(unpriced ? " (excludes unpriced models)" : "")}";
 
     static async Task<Message> Create(string model, MessageCreateParams p)
     {
@@ -29,7 +30,10 @@ static class Claude
             calls++;
             inputTokens += input;
             outputTokens += output;
-            cost += (input * Prices[model].Input + output * Prices[model].Output) / 1_000_000m;
+            if (Prices.TryGetValue(model, out var price))
+                cost += (input * price.Input + output * price.Output) / 1_000_000m;
+            else
+                unpriced = true;
         }
         return response;
     }

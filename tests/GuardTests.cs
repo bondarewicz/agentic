@@ -12,10 +12,10 @@ public class GuardTests
         Assert.Equal(Path.Combine(Agent.Root, "src", "Program.cs"), Agent.Resolve("src/Program.cs"));
 
     [Fact]
-    public void DotEnv_skips_comments_and_strips_quotes() =>
+    public void DotEnv_skips_comments_and_strips_quotes_and_export() =>
         Assert.Equal(
-            [("A", "1"), ("B", "x=y")],
-            DotEnv.Parse(["# ANTHROPIC_API_KEY=old", "A = \"1\"", "B=x=y", "junk"]));
+            [("A", "1"), ("B", "x=y"), ("C", "2"), ("D", "3")],
+            DotEnv.Parse(["# ANTHROPIC_API_KEY=old", "A = \"1\"", "B=x=y", "junk", "C='2'", "export D=3"]));
 }
 
 public class SeededWorkspaceTests
@@ -23,6 +23,7 @@ public class SeededWorkspaceTests
     [Fact]
     public void Fails_on_rounding_then_on_csv_then_passes_once_both_bugs_are_fixed()
     {
+        if (Directory.Exists(Agent.Root)) Directory.Delete(Agent.Root, recursive: true);
         Agent.SeedWorkspace();
         var invoice = Path.Combine(Agent.Root, "src", "Invoice.cs");
         Assert.Contains("FAIL VAT total", Agent.RunTests());
@@ -35,6 +36,20 @@ public class SeededWorkspaceTests
         File.WriteAllText(invoice, File.ReadAllText(invoice).Replace(
             "csv.Split('\\n')", "csv.Split('\\n', StringSplitOptions.RemoveEmptyEntries)"));
         Assert.Contains("All tests passed.", Agent.RunTests());
+    }
+
+    [Fact]
+    public void Refuses_to_delete_a_workspace_folder_it_did_not_create()
+    {
+        if (Directory.Exists(Agent.Root)) Directory.Delete(Agent.Root, recursive: true);
+        Directory.CreateDirectory(Agent.Root);
+        File.WriteAllText(Path.Combine(Agent.Root, "keep.txt"), "someone's real file");
+        try
+        {
+            Assert.Throws<InvalidOperationException>(Agent.SeedWorkspace);
+            Assert.True(File.Exists(Path.Combine(Agent.Root, "keep.txt")));
+        }
+        finally { Directory.Delete(Agent.Root, recursive: true); }
     }
 }
 

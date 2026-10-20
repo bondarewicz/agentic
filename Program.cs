@@ -36,7 +36,10 @@ static class DotEnv
         {
             var kv = line.Split('=', 2);
             if (kv.Length == 2 && !kv[0].TrimStart().StartsWith('#'))
-                yield return (kv[0].Trim(), kv[1].Trim().Trim('"'));
+            {
+                var key = kv[0].Trim();
+                yield return (key.StartsWith("export ") ? key[7..].TrimStart() : key, kv[1].Trim().Trim('"', '\''));
+            }
         }
     }
 }
