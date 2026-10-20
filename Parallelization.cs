@@ -23,19 +23,20 @@ static class Parallelization
 
     public static async Task Run()
     {
-        Console.WriteLine("== Sectioning: three reviewers, three aspects, in parallel ==");
         string[] aspects = ["security", "performance", "readability"];
         var reviews = await Task.WhenAll(aspects.Select(aspect =>
             Claude.Ask($"Review this C# code for {aspect} only. Two sentences max.\n\n{Code}")));
-        foreach (var (aspect, review) in aspects.Zip(reviews))
-            Console.WriteLine($"\n[{aspect}] {review}");
 
-        Console.WriteLine("\n== Voting: three independent opinions on one question ==");
         var votes = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ =>
             Claude.AskJson<Vote>($"Does this code contain a security vulnerability?\n\n{Code}", VoteSchema)));
-        foreach (var vote in votes)
-            Console.WriteLine($"  vulnerable={vote.Vulnerable}: {vote.Reason}");
         var yes = votes.Count(v => v.Vulnerable);
-        Console.WriteLine($"\nVerdict: {(yes >= 2 ? "VULNERABLE" : "ok")} ({yes}/3 votes)");
+        Console.WriteLine($"{aspects.Length} reviews and {votes.Length} votes in, {yes}/{votes.Length} say vulnerable.\n");
+
+        var findings = string.Join("\n", aspects.Zip(reviews, (a, r) => $"[{a}] {r}"))
+                     + "\n" + string.Join("\n", votes.Select(v => $"[vote vulnerable={v.Vulnerable}] {v.Reason}"));
+        var verdict = await Claude.Ask(
+            $"Code:\n{Code}\n\nReviewer findings:\n{findings}",
+            system: "You are a senior engineer giving the final call on a code review. Reply in at most three short lines: the verdict (ship or block), the one issue that matters most, and the fix. No preamble, no repeating the reviewers.");
+        Console.WriteLine(verdict);
     }
 }
