@@ -25,18 +25,6 @@ static class Parallelization
 
     record Vote(bool Vulnerable, string Reason);
 
-    static readonly object VoteSchema = new
-    {
-        type = "object",
-        properties = new
-        {
-            vulnerable = new { type = "boolean" },
-            reason = new { type = "string" },
-        },
-        required = new[] { "vulnerable", "reason" },
-        additionalProperties = false,
-    };
-
     public static async Task Run()
     {
         string[] aspects = ["security", "performance", "readability"];
@@ -53,9 +41,7 @@ static class Parallelization
                 .Range(0, 3)
                 .Select(_ =>
                     Claude.AskJson<Vote>(
-                        $"Does this code contain a security vulnerability?\n\n{CodeToReview}",
-                        VoteSchema
-                    )
+                        $"Does this code contain a security vulnerability?\n\n{CodeToReview}")
                 )
         );
         var yes = votes.Count(v => v.Vulnerable);

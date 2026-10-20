@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Anthropic.Models.Messages;
 
 // Augmented LLM: the answer lives in runbooks the model never saw, so it needs retrieval, tools and memory, the base every other pattern builds on.
@@ -14,32 +13,10 @@ static class AugmentedLlm
 
     static readonly List<Tool> Tools =
     [
-        new()
-        {
-            Name = "search_docs",
-            Description = "Search the internal runbooks and policies. Returns every line containing the query word.",
-            InputSchema = new()
-            {
-                Properties = new Dictionary<string, JsonElement>
-                {
-                    ["query"] = JsonSerializer.SerializeToElement(new { type = "string", description = "A single keyword, e.g. 'deploy'" }),
-                },
-                Required = ["query"],
-            },
-        },
-        new()
-        {
-            Name = "save_note",
-            Description = "Remember a fact about the user for future conversations.",
-            InputSchema = new()
-            {
-                Properties = new Dictionary<string, JsonElement>
-                {
-                    ["note"] = JsonSerializer.SerializeToElement(new { type = "string" }),
-                },
-                Required = ["note"],
-            },
-        },
+        Claude.DefineTool("search_docs", "Search the internal runbooks and policies. Returns every line containing the query word.",
+            ("query", new { type = "string", description = "A single keyword, e.g. 'deploy'" })),
+        Claude.DefineTool("save_note", "Remember a fact about the user for future conversations.",
+            ("note", new { type = "string" })),
     ];
 
     public static async Task Run()

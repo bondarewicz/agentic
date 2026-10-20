@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Anthropic.Models.Messages;
 
 // Agent: what's short and which supplier can deliver is only discovered along the way, so the model drives the loop; the stock check is the ground truth, and order approval and a step cap are the guardrails.
@@ -11,37 +10,13 @@ static class Agent
 
     static readonly List<Tool> Tools =
     [
-        new()
-        {
-            Name = "read_file",
-            Description = "Read one of the kitchen's files: bookings.csv (tonight's pre-ordered portions per dish), recipes.csv (grams of each ingredient per portion), stock.csv (grams in the fridge), orders.csv (orders placed today).",
-            InputSchema = new()
-            {
-                Properties = new Dictionary<string, JsonElement> { ["name"] = JsonSerializer.SerializeToElement(new { type = "string", @enum = Files }) },
-                Required = ["name"],
-            },
-        },
-        new()
-        {
-            Name = "check_kitchen",
-            Description = "Compare tonight's bookings with the stock and list every ingredient that is short, in grams. This is the source of truth for whether the kitchen is ready.",
-            InputSchema = new() { Properties = new Dictionary<string, JsonElement>(), Required = [] },
-        },
-        new()
-        {
-            Name = "place_order",
-            Description = "Order an ingredient for delivery before service. Fresco is the usual supplier. Use ingredient names exactly as in recipes.csv. A human approves every order.",
-            InputSchema = new()
-            {
-                Properties = new Dictionary<string, JsonElement>
-                {
-                    ["supplier"] = JsonSerializer.SerializeToElement(new { type = "string", @enum = Suppliers }),
-                    ["ingredient"] = JsonSerializer.SerializeToElement(new { type = "string" }),
-                    ["grams"] = JsonSerializer.SerializeToElement(new { type = "integer", minimum = 1 }),
-                },
-                Required = ["supplier", "ingredient", "grams"],
-            },
-        },
+        Claude.DefineTool("read_file", "Read one of the kitchen's files: bookings.csv (tonight's pre-ordered portions per dish), recipes.csv (grams of each ingredient per portion), stock.csv (grams in the fridge), orders.csv (orders placed today).",
+            ("name", new { type = "string", @enum = Files })),
+        Claude.DefineTool("check_kitchen", "Compare tonight's bookings with the stock and list every ingredient that is short, in grams. This is the source of truth for whether the kitchen is ready."),
+        Claude.DefineTool("place_order", "Order an ingredient for delivery before service. Fresco is the usual supplier. Use ingredient names exactly as in recipes.csv. A human approves every order.",
+            ("supplier", new { type = "string", @enum = Suppliers }),
+            ("ingredient", new { type = "string" }),
+            ("grams", new { type = "integer", minimum = 1 })),
     ];
 
     public static async Task Run()
