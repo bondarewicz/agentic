@@ -13,7 +13,7 @@ dotnet run -- chaining      # or any name from the table
 
 Program.cs loads `.env` at startup; a key already exported in your shell takes precedence.
 
-Open `agentic.sln` in Rider to see both projects. `dotnet test agentic.sln` runs the offline tests: the agent's sandbox check, the `.env` parser, and a check that the seeded bugs are fixable.
+Open `agentic.sln` in Rider to see both projects. `dotnet test agentic.sln` runs the offline tests: the `.env` parser, the commit message format check, and the agent's stock check, ordering and workspace guard.
 
 | Example | Article section | File | What to look at |
 |---|---|---|---|
@@ -23,7 +23,7 @@ Open `agentic.sln` in Rider to see both projects. `dotnet test agentic.sln` runs
 | `parallel` | Workflow: parallelization | `Parallelization.cs` | `Task.WhenAll` for sectioning, majority count for voting |
 | `orchestrator` | Workflow: orchestrator-workers | `OrchestratorWorkers.cs` | The model decides the subtasks; code fans them out and the model merges |
 | `evaluator` | Workflow: evaluator-optimizer | `EvaluatorOptimizer.cs` | Writes a commit message for a diff. Code checks the Conventional Commits format first, then Claude grades the judgement criteria, and the feedback loops back until it passes or hits the round limit |
-| `agent` | Agents | `Agent.cs` | Fixes a seeded invoice project until its tests pass: runs the tests, reads the failure, edits with your approval, repeats. Review the files in the gitignored `workspace` folder |
+| `agent` | Agents | `Agent.cs` | Luigi's kitchen assistant: checks tonight's bookings against stock, orders what's missing with your approval, and works around a sold-out supplier until the stock check passes. Review the CSV files in the gitignored `workspace` folder |
 
 ## The shared helper
 
@@ -40,5 +40,5 @@ Every workflow is ordinary C# control flow around those three calls. That is the
 - Make the gate in `chaining` fail (set the word limit to 20) and watch the chain stop.
 - Add a fourth route to `routing` and see the classifier pick it up from the enum alone.
 - Replace the SQL injection in `parallel` with clean code and see the vote flip.
-- Reject the agent's first fix and watch how it explains itself and stops.
-- Plant a third bug in the seeded `Invoice.cs` and see the agent need more rounds.
+- Reject the agent's first order and watch how it explains itself and stops.
+- Add a booking or sell out a second ingredient in `Agent.cs` and see the agent need more rounds.

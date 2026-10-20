@@ -1,37 +1,46 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Anthropic.Models.Messages;
 
-// Agent: how many fix-and-test rounds it takes can't be known up front, so the model drives the loop; test output is the ground truth, and a human checkpoint and step cap are the guardrails.
+// Agent: what's short and which supplier can deliver is only discovered along the way, so the model drives the loop; the stock check is the ground truth, and order approval and a step cap are the guardrails.
 static class Agent
 {
     internal static readonly string Root = Path.GetFullPath("workspace");
+    static readonly string[] Files = ["bookings.csv", "recipes.csv", "stock.csv", "orders.csv"];
+    static readonly string[] Suppliers = ["Fresco", "Dairy Dan"];
+    static readonly HashSet<(string Supplier, string Ingredient)> SoldOut = [("Fresco", "mascarpone")];
 
     static readonly List<Tool> Tools =
     [
         new()
         {
-            Name = "list_files",
-            Description = "List the source files in the workspace, as paths relative to the workspace root.",
-            InputSchema = new() { Properties = new Dictionary<string, JsonElement>(), Required = [] },
-        },
-        new()
-        {
             Name = "read_file",
-            Description = "Read a file. Path is relative to the workspace root, e.g. 'src/Invoice.cs'.",
-            InputSchema = Schema("path"),
+            Description = "Read one of the kitchen's files: bookings.csv (tonight's pre-ordered portions per dish), recipes.csv (grams of each ingredient per portion), stock.csv (grams in the fridge), orders.csv (orders placed today).",
+            InputSchema = new()
+            {
+                Properties = new Dictionary<string, JsonElement> { ["name"] = JsonSerializer.SerializeToElement(new { type = "string", @enum = Files }) },
+                Required = ["name"],
+            },
         },
         new()
         {
-            Name = "write_file",
-            Description = "Replace a file's whole content. Path is relative to the workspace root. Tests.cs is read-only. A human approves every write.",
-            InputSchema = Schema("path", "content"),
-        },
-        new()
-        {
-            Name = "run_tests",
-            Description = "Build the workspace and run its tests. Stops at the first failing test and prints it, or prints build errors.",
+            Name = "check_kitchen",
+            Description = "Compare tonight's bookings with the stock and list every ingredient that is short, in grams. This is the source of truth for whether the kitchen is ready.",
             InputSchema = new() { Properties = new Dictionary<string, JsonElement>(), Required = [] },
+        },
+        new()
+        {
+            Name = "place_order",
+            Description = "Order an ingredient for delivery before service. Fresco is the usual supplier. Use ingredient names exactly as in recipes.csv. A human approves every order.",
+            InputSchema = new()
+            {
+                Properties = new Dictionary<string, JsonElement>
+                {
+                    ["supplier"] = JsonSerializer.SerializeToElement(new { type = "string", @enum = Suppliers }),
+                    ["ingredient"] = JsonSerializer.SerializeToElement(new { type = "string" }),
+                    ["grams"] = JsonSerializer.SerializeToElement(new { type = "integer", minimum = 1 }),
+                },
+                Required = ["supplier", "ingredient", "grams"],
+            },
         },
     ];
 
@@ -42,126 +51,79 @@ static class Agent
 
         List<MessageParam> messages =
         [
-            new() { Role = Role.User, Content = "The tests in this project fail. Fix the code so every test passes. Do not change the tests." },
+            new() { Role = Role.User, Content = "Make sure the kitchen can cook every pre-ordered dish tonight. Order only what is missing." },
         ];
         var result = await Claude.ToolLoop(messages, Tools, Execute,
-            system: "You are a coding agent in a sandboxed workspace. Run the tests first, read the code the failure points to, make the smallest fix, and run the tests again after every change. Stop when all tests pass and summarise what you fixed.",
-            maxSteps: 20);
+            system: "You are the kitchen assistant at Luigi's, a small pizzeria. Look before you act: read the files and run check_kitchen before ordering, and run it again after ordering. If a supplier cannot deliver, find another way. Stop when check_kitchen says everything is in stock, and summarise what you ordered.",
+            maxSteps: 15);
         Console.WriteLine($"\nAgent: {result}");
     }
 
     static string Execute(ToolUseBlock call) => call.Name switch
     {
-        "list_files" => string.Join("\n", Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories)
-            .Select(f => Path.GetRelativePath(Root, f))
-            .Where(f => f.Split(Path.DirectorySeparatorChar)[0] is not ("bin" or "obj"))),
-        "read_file" => File.ReadAllText(Resolve(call.Input["path"].GetString()!)),
-        "write_file" => Write(call.Input["path"].GetString()!, call.Input["content"].GetString()!),
-        "run_tests" => RunTests(),
+        "read_file" => ReadFile(call.Input["name"].GetString()!),
+        "check_kitchen" => Shortages(),
+        "place_order" => PlaceOrder(call.Input["supplier"].GetString()!, call.Input["ingredient"].GetString()!, call.Input["grams"].GetInt32()),
         _ => throw new ArgumentException($"Unknown tool {call.Name}"),
     };
 
-    static string Write(string path, string content)
+    static string ReadFile(string name) =>
+        Files.Contains(name) ? File.ReadAllText(Path.Combine(Root, name)) : throw new ArgumentException($"Unknown file '{name}'. Use one of: {string.Join(", ", Files)}.");
+
+    internal static string PlaceOrder(string supplier, string ingredient, int grams)
     {
-        var full = Resolve(path);
-        if (Path.GetFileName(full) == "Tests.cs")
-            throw new ArgumentException("Tests.cs is read-only. Fix the code under src instead.");
-        Console.WriteLine($"\n--- Agent wants to write {path} ---\n{content}\n--- Approve? [y/N] ");
+        ingredient = ingredient.Trim().ToLowerInvariant();
+        if (!Suppliers.Contains(supplier))
+            throw new ArgumentException($"Unknown supplier '{supplier}'. Use one of: {string.Join(", ", Suppliers)}.");
+        if (!Csv("recipes.csv").Any(r => r[1] == ingredient))
+            throw new ArgumentException($"Unknown ingredient '{ingredient}'. Use a name exactly as in recipes.csv.");
+        if (grams <= 0)
+            throw new ArgumentException("Order at least 1 gram.");
+        if (SoldOut.Contains((supplier, ingredient)))
+            return $"{supplier}: {ingredient} is sold out today.";
+
+        Console.WriteLine($"\n--- Agent wants to order {grams} g of {ingredient} from {supplier}. Approve? [y/N] ");
         if (Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) != true)
-            return "The user rejected this write. Explain what you intended and stop.";
-        File.WriteAllText(full, content);
-        return $"Wrote {content.Length} characters to {path}.";
+            return "The user rejected this order. Explain what you intended and stop.";
+
+        File.AppendAllText(Path.Combine(Root, "orders.csv"), $"{supplier},{ingredient},{grams}\n");
+        var stock = Csv("stock.csv").ToDictionary(r => r[0], r => int.Parse(r[1]));
+        stock[ingredient] = stock.GetValueOrDefault(ingredient) + grams;
+        File.WriteAllLines(Path.Combine(Root, "stock.csv"), ["ingredient,grams", .. stock.Select(s => $"{s.Key},{s.Value}")]);
+        return $"Ordered {grams} g of {ingredient} from {supplier}. It arrives before service and stock.csv is updated.";
     }
 
-    internal static string RunTests()
+    internal static string Shortages()
     {
-        using var process = Process.Start(new ProcessStartInfo("dotnet", "run -v q")
-        {
-            WorkingDirectory = Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        })!;
-        var output = process.StandardOutput.ReadToEndAsync();
-        var errors = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(TimeSpan.FromMinutes(2)))
-        {
-            process.Kill(entireProcessTree: true);
-            return "Tests timed out after 2 minutes.";
-        }
-        var result = $"exit code {process.ExitCode}\n{output.Result}{errors.Result}";
-        Console.WriteLine(result);
-        return result;
+        var stock = Csv("stock.csv").ToDictionary(r => r[0], r => int.Parse(r[1]));
+        var portions = Csv("bookings.csv").ToDictionary(r => r[0], r => int.Parse(r[1]));
+        var shortages = Csv("recipes.csv")
+            .GroupBy(r => r[1], r => int.Parse(r[2]) * portions.GetValueOrDefault(r[0]))
+            .Select(g => (Ingredient: g.Key, Missing: g.Sum() - stock.GetValueOrDefault(g.Key)))
+            .Where(x => x.Missing > 0)
+            .Select(x => $"{x.Ingredient}: {x.Missing} g short")
+            .ToList();
+        return shortages.Count == 0 ? "Everything for tonight's bookings is in stock." : "Short:\n" + string.Join("\n", shortages);
     }
 
-    internal static string Resolve(string relative)
-    {
-        var full = Path.GetFullPath(Path.Combine(Root, relative));
-        if (full != Root && !full.StartsWith(Root + Path.DirectorySeparatorChar))
-            throw new ArgumentException($"'{relative}' is outside the workspace. Use a path relative to the workspace root.");
-        return full;
-    }
-
-    static InputSchema Schema(params string[] stringProps) => new()
-    {
-        Properties = stringProps.ToDictionary(p => p, _ => JsonSerializer.SerializeToElement(new { type = "string" })),
-        Required = [.. stringProps],
-    };
+    static IEnumerable<string[]> Csv(string name) =>
+        File.ReadLines(Path.Combine(Root, name)).Skip(1).Where(l => l.Trim() != "").Select(l => l.Split(','));
 
     internal static void SeedWorkspace()
     {
         if (Directory.Exists(Root))
         {
-            if (!File.Exists(Path.Combine(Root, "Invoicer.csproj")))
+            if (!File.Exists(Path.Combine(Root, "bookings.csv")))
                 throw new InvalidOperationException($"{Root} exists and is not the agent's workspace. Move or delete it, or run from the project folder.");
             Directory.Delete(Root, recursive: true);
         }
-        Directory.CreateDirectory(Path.Combine(Root, "src"));
-        File.WriteAllText(Path.Combine(Root, "Invoicer.csproj"), """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net10.0</TargetFramework>
-                <ImplicitUsings>enable</ImplicitUsings>
-              </PropertyGroup>
-            </Project>
-            """);
-        File.WriteAllText(Path.Combine(Root, "src", "Invoice.cs"), """
-            using System.Globalization;
-
-            public record Line(string Description, decimal Hours, decimal Rate);
-
-            public static class Invoice
-            {
-                public const decimal VatRate = 0.23m;
-
-                public static List<Line> Parse(string csv) =>
-                    csv.Split('\n')
-                       .Skip(1)
-                       .Select(row => row.Split(','))
-                       .Select(c => new Line(c[0], decimal.Parse(c[1], CultureInfo.InvariantCulture), decimal.Parse(c[2], CultureInfo.InvariantCulture)))
-                       .ToList();
-
-                public static decimal Total(IEnumerable<Line> lines) =>
-                    lines.Sum(l => Math.Round(l.Hours * l.Rate * (1 + VatRate), 2));
-            }
-            """);
-        File.WriteAllText(Path.Combine(Root, "Tests.cs"), """
-            Equal("VAT total is rounded once, not per line", 193.68m, () => Invoice.Total(
-                [new("Design", 1.5m, 33.33m), new("Build", 2.25m, 41.10m), new("Review", 0.75m, 19.99m)]));
-            Equal("a trailing newline in the CSV is not a line", 1, () => Invoice.Parse("description,hours,rate\nDesign,2,100\n").Count);
-            Console.WriteLine("All tests passed.");
-
-            static void Equal<T>(string name, T expected, Func<T> actual)
-            {
-                try
-                {
-                    var value = actual();
-                    if (Equals(value, expected)) { Console.WriteLine($"PASS {name}"); return; }
-                    Console.WriteLine($"FAIL {name}: expected {expected}, got {value}");
-                }
-                catch (Exception e) { Console.WriteLine($"FAIL {name}: {e.GetType().Name}: {e.Message}"); }
-                Environment.Exit(1);
-            }
-            """);
+        Directory.CreateDirectory(Root);
+        File.WriteAllText(Path.Combine(Root, "bookings.csv"), "dish,portions\nmargherita,8\npesto pasta,6\ntiramisu,5\n");
+        File.WriteAllText(Path.Combine(Root, "recipes.csv"),
+            "dish,ingredient,grams_per_portion\nmargherita,flour,200\nmargherita,mozzarella,120\nmargherita,tomato sauce,80\n" +
+            "pesto pasta,pasta,120\npesto pasta,pesto,60\ntiramisu,mascarpone,100\ntiramisu,ladyfingers,60\n");
+        File.WriteAllText(Path.Combine(Root, "stock.csv"),
+            "ingredient,grams\nflour,5000\nmozzarella,400\ntomato sauce,1000\npasta,2000\npesto,500\nmascarpone,0\nladyfingers,1000\n");
+        File.WriteAllText(Path.Combine(Root, "orders.csv"), "supplier,ingredient,grams\n");
     }
 }

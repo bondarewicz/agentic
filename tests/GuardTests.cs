@@ -1,16 +1,5 @@
 public class GuardTests
 {
-    [Theory]
-    [InlineData("../x")]
-    [InlineData("/etc/passwd")]
-    [InlineData("../workspace2/x")]
-    public void Resolve_rejects_paths_outside_the_workspace(string path) =>
-        Assert.Throws<ArgumentException>(() => Agent.Resolve(path));
-
-    [Fact]
-    public void Resolve_accepts_paths_inside_the_workspace() =>
-        Assert.Equal(Path.Combine(Agent.Root, "src", "Program.cs"), Agent.Resolve("src/Program.cs"));
-
     [Fact]
     public void DotEnv_skips_comments_and_strips_quotes_and_export() =>
         Assert.Equal(
@@ -21,21 +10,24 @@ public class GuardTests
 public class SeededWorkspaceTests
 {
     [Fact]
-    public void Fails_on_rounding_then_on_csv_then_passes_once_both_bugs_are_fixed()
+    public void Seeded_kitchen_is_short_of_mozzarella_and_mascarpone_only()
     {
         if (Directory.Exists(Agent.Root)) Directory.Delete(Agent.Root, recursive: true);
         Agent.SeedWorkspace();
-        var invoice = Path.Combine(Agent.Root, "src", "Invoice.cs");
-        Assert.Contains("FAIL VAT total", Agent.RunTests());
+        Assert.Equal("Short:\nmozzarella: 560 g short\nmascarpone: 500 g short", Agent.Shortages());
+    }
 
-        File.WriteAllText(invoice, File.ReadAllText(invoice).Replace(
-            "lines.Sum(l => Math.Round(l.Hours * l.Rate * (1 + VatRate), 2))",
-            "Math.Round(lines.Sum(l => l.Hours * l.Rate) * (1 + VatRate), 2)"));
-        Assert.Contains("FAIL a trailing newline", Agent.RunTests());
+    [Fact]
+    public void Approved_order_updates_stock_and_sold_out_item_is_refused()
+    {
+        if (Directory.Exists(Agent.Root)) Directory.Delete(Agent.Root, recursive: true);
+        Agent.SeedWorkspace();
+        Console.SetIn(new StringReader("y\n"));
 
-        File.WriteAllText(invoice, File.ReadAllText(invoice).Replace(
-            "csv.Split('\\n')", "csv.Split('\\n', StringSplitOptions.RemoveEmptyEntries)"));
-        Assert.Contains("All tests passed.", Agent.RunTests());
+        Assert.Contains("sold out", Agent.PlaceOrder("Fresco", "mascarpone", 500));
+        Assert.Contains("Ordered", Agent.PlaceOrder("Fresco", " Mozzarella ", 560));
+        Assert.Equal("Short:\nmascarpone: 500 g short", Agent.Shortages());
+        Assert.Throws<ArgumentException>(() => Agent.PlaceOrder("Fresco", "mozzarella cheese", 100));
     }
 
     [Fact]
