@@ -51,6 +51,8 @@ public class CommitFormatTests
     [InlineData("```\nfix: wrapped in a fence\n```")]
     [InlineData("fix: this subject line is far too long to fit within the seventy two character limit")]
     [InlineData("fix: no blank line\nbody starts here")]
+    [InlineData("fix: end the subject with a period.")]
+    [InlineData("fix: long body line\n\nThis body line keeps going well past the seventy two character wrapping limit.")]
     public void Rejects_broken_messages(string message) =>
         Assert.NotNull(EvaluatorOptimizer.FormatProblem(message));
 }

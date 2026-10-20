@@ -23,7 +23,7 @@ static class EvaluatorOptimizer
              return string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(t => t.Text));
         """;
 
-    const string Criteria = "Criteria: 1) the type fits the change, 2) the body explains why the change was needed, not which lines changed, 3) the subject is in the imperative mood, 4) nothing in it just restates the diff.";
+    const string Criteria = "Criteria: 1) the type fits the change, 2) the body explains what changed and why, not how, 3) the subject is imperative and completes 'If applied, this commit will ...', 4) the subject aims for about 50 characters, 5) nothing in it just restates the diff.";
 
     public static async Task Run()
     {
@@ -41,7 +41,7 @@ static class EvaluatorOptimizer
             if (feedback is null)
             {
                 var verdict = await Claude.AskJson<Verdict>(
-                    $"You are a demanding code reviewer. Evaluate this commit message for the diff. Pass only if all four criteria hold.\n{Criteria}\n\nDiff:\n{Diff}\n\nMessage:\n{message}",
+                    $"You are a demanding code reviewer. Evaluate this commit message for the diff. Pass only if every criterion holds.\n{Criteria}\n\nDiff:\n{Diff}\n\nMessage:\n{message}",
                     VerdictSchema);
                 if (verdict.Pass) { Console.WriteLine("Reviewer: PASS"); return; }
                 feedback = verdict.Feedback;
@@ -59,8 +59,12 @@ static class EvaluatorOptimizer
             return "The subject must follow Conventional Commits, 'type(scope): summary', for example 'fix: ...'. No code fences or quotes around the message.";
         if (subject.Length > 72)
             return $"The subject is {subject.Length} characters. Keep it at 72 or fewer.";
+        if (subject.EndsWith('.'))
+            return "Do not end the subject with a period.";
         if (lines.Length > 1 && lines[1].Trim() != "")
             return "Leave one blank line between the subject and the body.";
+        if (lines.Skip(2).FirstOrDefault(l => l.Length > 72) is { } longLine)
+            return $"Wrap the body at 72 characters. This line is {longLine.Length}: '{longLine}'";
         return null;
     }
 }
