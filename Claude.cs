@@ -66,7 +66,7 @@ static class Claude
             Schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
                 Json.GetJsonSchemaAsNode(
                         typeof(T),
-                        new() { TreatNullObliviousAsNonNullable = true }
+                        new JsonSchemaExporterOptions { TreatNullObliviousAsNonNullable = true }
                     )
                     .ToJsonString()
             )!,
@@ -215,6 +215,7 @@ static class Claude
             throw new InvalidOperationException(
                 $"Claude refused: {response.StopDetails?.Explanation}"
             );
+
         return response.StopReason == "max_tokens"
             ? throw new InvalidOperationException("Reply was cut off at the token limit.")
             : string.Concat(
