@@ -39,30 +39,30 @@ static class Claude
                 Tools = tools.Select(t => (ToolUnion)t).ToList(),
             });
 
-            List<ContentBlockParam> assistant = [];
-            List<ContentBlockParam> results = [];
-            foreach (var block in response.Content)
-            {
-                if (block.TryPickText(out var text))
-                    assistant.Add(new TextBlockParam { Text = text.Text });
-                else if (block.TryPickThinking(out var thinking))
-                    assistant.Add(new ThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature });
-                else if (block.TryPickRedactedThinking(out var redacted))
-                    assistant.Add(new RedactedThinkingBlockParam { Data = redacted.Data });
-                else if (block.TryPickToolUse(out var use))
-                {
-                    assistant.Add(new ToolUseBlockParam { ID = use.ID, Name = use.Name, Input = use.Input });
-                    var input = JsonSerializer.Serialize(use.Input);
-                    Console.WriteLine($"  [step {step}] {use.Name}({(input.Length > 120 ? input[..120] + "…" : input)})");
-                    try { results.Add(new ToolResultBlockParam { ToolUseID = use.ID, Content = execute(use) }); }
-                    catch (Exception e) { results.Add(new ToolResultBlockParam { ToolUseID = use.ID, Content = e.Message, IsError = true }); }
-                }
-            }
-            messages.Add(new() { Role = Role.Assistant, Content = assistant });
+            messages.Add(new() { Role = Role.Assistant, Content = response.Content.Select(ToParam).ToList() });
             if (response.StopReason != "tool_use") return Text(response);
+
+            List<ContentBlockParam> results = [.. response.Content.Select(b => b.Value).OfType<ToolUseBlock>().Select(use => RunTool(use, execute, step))];
             messages.Add(new() { Role = Role.User, Content = results });
         }
         throw new InvalidOperationException($"Did not finish within {maxSteps} steps.");
+    }
+
+    static ContentBlockParam ToParam(ContentBlock block) => block.Value switch
+    {
+        TextBlock t => new TextBlockParam { Text = t.Text },
+        ThinkingBlock t => new ThinkingBlockParam { Thinking = t.Thinking, Signature = t.Signature },
+        RedactedThinkingBlock r => new RedactedThinkingBlockParam { Data = r.Data },
+        ToolUseBlock u => new ToolUseBlockParam { ID = u.ID, Name = u.Name, Input = u.Input },
+        var other => throw new NotSupportedException($"Unexpected content block {other?.GetType().Name}"),
+    };
+
+    static ToolResultBlockParam RunTool(ToolUseBlock use, Func<ToolUseBlock, string> execute, int step)
+    {
+        var input = JsonSerializer.Serialize(use.Input);
+        Console.WriteLine($"  [step {step}] {use.Name}({(input.Length > 120 ? input[..120] + "…" : input)})");
+        try { return new() { ToolUseID = use.ID, Content = execute(use) }; }
+        catch (Exception e) { return new() { ToolUseID = use.ID, Content = e.Message, IsError = true }; }
     }
 
     static MessageCreateParams Params(string prompt, string? system, string model, OutputConfig? outputConfig = null) => new()
