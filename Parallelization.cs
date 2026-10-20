@@ -1,3 +1,4 @@
+// Parallelization: security, speed and readability are independent checks (sectioning), and a yes/no vulnerability call is more reliable as a majority vote.
 static class Parallelization
 {
     const string Code = """

@@ -1,3 +1,4 @@
+// Orchestrator-workers: the brief's sections can't be known in advance, so the model plans them instead of the code.
 static class OrchestratorWorkers
 {
     record Plan(Subtask[] Subtasks);

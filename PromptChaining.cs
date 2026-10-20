@@ -1,3 +1,4 @@
+// Prompt chaining: write-then-translate splits into fixed steps, and a cheap code gate stops a bad draft before the second call.
 static class PromptChaining
 {
     public static async Task Run()

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Anthropic.Models.Messages;
 
+// Agent: how many files to read and when it is done can't be hardcoded, so the model drives the loop, with a human checkpoint and step cap as guardrails.
 static class Agent
 {
     internal static readonly string Root = Path.Combine(Path.GetTempPath(), "agents-workspace");

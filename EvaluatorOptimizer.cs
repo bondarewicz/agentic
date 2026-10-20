@@ -1,3 +1,4 @@
+// Evaluator-optimizer: literary translation has clear criteria and measurably improves with critique.
 static class EvaluatorOptimizer
 {
     record Verdict(bool Pass, string Feedback);

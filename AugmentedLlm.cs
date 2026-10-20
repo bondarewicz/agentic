@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Anthropic.Models.Messages;
 
+// Augmented LLM: the answer lives in runbooks the model never saw, so it needs retrieval, tools and memory, the base every other pattern builds on.
 static class AugmentedLlm
 {
     static readonly string[] Docs =

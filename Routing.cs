@@ -1,3 +1,4 @@
+// Routing: refunds, bugs and small talk need different prompts, and easy questions can go to a cheaper model.
 static class Routing
 {
     record Route(string Category, string Difficulty, string Reason);
