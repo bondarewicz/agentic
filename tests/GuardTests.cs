@@ -20,12 +20,15 @@ public class GuardTests
 public class SeededWorkspaceTests
 {
     [Fact]
-    public void Seeded_kitchen_is_short_of_mozzarella_and_mascarpone_only()
+    public void Seeded_kitchen_is_short_of_mozzarella_and_gorgonzola_only()
     {
         if (Directory.Exists(Agent.Root))
             Directory.Delete(Agent.Root, recursive: true);
         Agent.SeedWorkspace();
-        Assert.Equal("Short:\nmozzarella: 560 g short\nmascarpone: 500 g short", Agent.Shortages());
+        Assert.Equal(
+            "Short:\nmozzarella: 1800 g short\ngorgonzola: 500 g short",
+            Agent.Shortages()
+        );
     }
 
     [Fact]
@@ -36,12 +39,10 @@ public class SeededWorkspaceTests
         Agent.SeedWorkspace();
         Console.SetIn(new StringReader("y\n"));
 
-        Assert.Contains("sold out", Agent.PlaceOrder("Fresco", "mascarpone", 500));
-        Assert.Contains("Ordered", Agent.PlaceOrder("Fresco", " Mozzarella ", 560));
-        Assert.Equal("Short:\nmascarpone: 500 g short", Agent.Shortages());
-        Assert.Throws<ArgumentException>(() =>
-            Agent.PlaceOrder("Fresco", "mozzarella cheese", 100)
-        );
+        Assert.Contains("sold out", Agent.PlaceOrder("Fresco", "gorgonzola", 1));
+        Assert.Contains("Ordered", Agent.PlaceOrder("Fresco", " Mozzarella ", 1));
+        Assert.Equal("Short:\ngorgonzola: 500 g short", Agent.Shortages());
+        Assert.Throws<ArgumentException>(() => Agent.PlaceOrder("Fresco", "mozzarella cheese", 1));
     }
 
     [Fact]

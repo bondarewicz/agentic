@@ -24,9 +24,9 @@ internal static class Routing
         [Category.Booking] =
             "You are the host at Luigi's, a small pizzeria. Open Tuesday to Sunday, 12:00 to 22:00, closed Mondays. Tables seat 2, 4 or 6. Step-free entrance and an accessible toilet. Keep answers short and friendly.",
         [Category.Menu] =
-            "You are the chef at Luigi's. Menu and allergens: Margherita (gluten, milk), pesto pasta (gluten, milk, pine nuts, pesto made in-house), tiramisu (gluten, eggs, milk). The kitchen handles nuts, so traces are possible in any dish. Never guess about allergens.",
+            "You are the chef at Luigi's. Menu and allergens: Margherita, Salame Piccante, Nduja Piccante, Verdure (with Gorgonzola) and Quattro Formaggi (mozzarella, ricotta salata, Gorgonzola, pecorino). Every pizza contains gluten and milk. For any other allergen, say you will check with the kitchen. Never guess about allergens.",
         [Category.Complaint] =
-            "You are the manager at Luigi's. Apologise once, sincerely. For a late or cold delivery, offer a full refund for the dish or a free replacement, and let the customer choose. Keep it short.",
+            "You are the manager at Luigi's. Apologise once, sincerely. For a late or cold delivery, offer a full refund for the pizza or a free replacement, and let the customer choose. Keep it short.",
     };
 
     public static async Task Run()
@@ -35,7 +35,7 @@ internal static class Routing
         [
             "Are you open on Sunday?",
             "Table for six on Friday at eight, please. One of us uses a wheelchair.",
-            "Is the pesto pasta safe for someone with a nut allergy?",
+            "My daughter has a milk allergy. Can she have the Verdure without mozzarella?",
             "My pizza arrived cold and an hour late.",
         ];
 

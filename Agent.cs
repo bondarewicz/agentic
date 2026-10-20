@@ -5,25 +5,26 @@ namespace Agents;
 
 internal static class Agent
 {
-    internal static readonly string Root = Path.GetFullPath("workspace");
+    private static readonly string Root = Path.GetFullPath("workspace");
     private static readonly string[] Files =
     [
         "bookings.csv",
         "recipes.csv",
         "stock.csv",
+        "suppliers.csv",
         "orders.csv",
     ];
     private static readonly string[] Suppliers = ["Fresco", "Dairy Dan"];
     private static readonly HashSet<(string Supplier, string Ingredient)> SoldOut =
     [
-        ("Fresco", "mascarpone"),
+        ("Fresco", "gorgonzola"),
     ];
 
     private static readonly List<Tool> Tools =
     [
         Claude.DefineTool(
             "read_file",
-            "Read one of the kitchen's files: bookings.csv (tonight's pre-ordered portions per dish), recipes.csv (grams of each ingredient per portion), stock.csv (grams in the fridge), orders.csv (orders placed today).",
+            "Read one of the kitchen's files: bookings.csv (pizzas expected tonight per type), recipes.csv (grams of each ingredient per pizza), stock.csv (grams in the fridge), suppliers.csv (what each supplier sells and its pack size in grams), orders.csv (orders placed today).",
             ("name", new { type = "string", @enum = Files })
         ),
         Claude.DefineTool(
@@ -32,10 +33,10 @@ internal static class Agent
         ),
         Claude.DefineTool(
             "place_order",
-            "Order an ingredient for delivery before service. Fresco is the usual supplier. Use ingredient names exactly as in recipes.csv. A human approves every order.",
+            "Order whole packs of an ingredient for delivery before service. Fresco is the usual supplier. Pack sizes are in suppliers.csv. A human approves every order.",
             ("supplier", new { type = "string", @enum = Suppliers }),
             ("ingredient", new { type = "string" }),
-            ("grams", new { type = "integer", minimum = 1 })
+            ("packs", new { type = "integer", minimum = 1 })
         ),
     ];
 
@@ -50,7 +51,7 @@ internal static class Agent
             {
                 Role = Role.User,
                 Content =
-                    "Make sure the kitchen can cook every pre-ordered dish tonight. Order only what is missing.",
+                    "Make sure the kitchen can cook every pizza expected tonight. Order only what is missing.",
             },
         ];
         var result = await Claude.ToolLoop(
@@ -71,7 +72,7 @@ internal static class Agent
             "place_order" => PlaceOrder(
                 call.Input["supplier"].GetString()!,
                 call.Input["ingredient"].GetString()!,
-                call.Input["grams"].GetInt32()
+                call.Input["packs"].GetInt32()
             ),
             _ => throw new ArgumentException($"Unknown tool {call.Name}"),
         };
@@ -83,24 +84,26 @@ internal static class Agent
                 $"Unknown file '{name}'. Use one of: {string.Join(", ", Files)}."
             );
 
-    internal static string PlaceOrder(string supplier, string ingredient, int grams)
+    internal static string PlaceOrder(string supplier, string ingredient, int packs)
     {
         ingredient = ingredient.Trim().ToLowerInvariant();
         if (!Suppliers.Contains(supplier))
             throw new ArgumentException(
                 $"Unknown supplier '{supplier}'. Use one of: {string.Join(", ", Suppliers)}."
             );
-        if (Csv("recipes.csv").All(r => r[1] != ingredient))
+        var pack = Csv("suppliers.csv").FirstOrDefault(r => r[0] == supplier && r[1] == ingredient);
+        if (pack is null)
             throw new ArgumentException(
-                $"Unknown ingredient '{ingredient}'. Use a name exactly as in recipes.csv."
+                $"{supplier} does not sell '{ingredient}'. See suppliers.csv."
             );
-        if (grams <= 0)
-            throw new ArgumentException("Order at least 1 gram.");
+        if (packs <= 0)
+            throw new ArgumentException("Order at least 1 pack.");
         if (SoldOut.Contains((supplier, ingredient)))
             return $"{supplier}: {ingredient} is sold out today.";
 
+        var grams = packs * int.Parse(pack[2]);
         Console.WriteLine(
-            $"\n--- Agent wants to order {grams} g of {ingredient} from {supplier}. Approve? [y/N] "
+            $"\n--- Agent wants to order {packs} x {pack[2]} g of {ingredient} ({grams} g) from {supplier}. Approve? [y/N] "
         );
         if (Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) != true)
             return "The user rejected this order. Explain what you intended and stop.";
@@ -112,7 +115,7 @@ internal static class Agent
             Path.Combine(Root, "stock.csv"),
             ["ingredient,grams", .. stock.Select(s => $"{s.Key},{s.Value}")]
         );
-        return $"Ordered {grams} g of {ingredient} from {supplier}. It arrives before service and stock.csv is updated.";
+        return $"Ordered {packs} x {pack[2]} g ({grams} g) of {ingredient} from {supplier}. It arrives before service and stock.csv is updated.";
     }
 
     internal static string Shortages()
@@ -149,16 +152,24 @@ internal static class Agent
         Directory.CreateDirectory(Root);
         File.WriteAllText(
             Path.Combine(Root, "bookings.csv"),
-            "dish,portions\nmargherita,8\npesto pasta,6\ntiramisu,5\n"
+            "pizza,portions\nmargherita,16\nsalame piccante,12\nnduja piccante,8\nverdure,6\nquattro formaggi,8\n"
         );
         File.WriteAllText(
             Path.Combine(Root, "recipes.csv"),
-            "dish,ingredient,grams_per_portion\nmargherita,flour,200\nmargherita,mozzarella,120\nmargherita,tomato sauce,80\n"
-                + "pesto pasta,pasta,120\npesto pasta,pesto,60\ntiramisu,mascarpone,100\ntiramisu,ladyfingers,60\n"
+            "pizza,ingredient,grams_per_portion\n"
+                + "margherita,dough,250\nmargherita,tomato sauce,80\nmargherita,mozzarella,120\nmargherita,basil,5\n"
+                + "salame piccante,dough,250\nsalame piccante,tomato sauce,80\nsalame piccante,mozzarella,100\nsalame piccante,spianata salami,60\n"
+                + "nduja piccante,dough,250\nnduja piccante,tomato sauce,80\nnduja piccante,mozzarella,100\nnduja piccante,onion,30\nnduja piccante,nduja,50\nnduja piccante,green chilli peppers,20\nnduja piccante,lemon oil,5\nnduja piccante,parsley,3\n"
+                + "verdure,dough,250\nverdure,tomato sauce,80\nverdure,mozzarella,100\nverdure,spinach,40\nverdure,grilled pepper,40\nverdure,grilled courgette,40\nverdure,gorgonzola,50\nverdure,balsamic glaze,10\n"
+                + "quattro formaggi,dough,250\nquattro formaggi,tomato sauce,80\nquattro formaggi,mozzarella,60\nquattro formaggi,ricotta salata,40\nquattro formaggi,gorgonzola,50\nquattro formaggi,pecorino romano,20\nquattro formaggi,basil,5\n"
         );
         File.WriteAllText(
             Path.Combine(Root, "stock.csv"),
-            "ingredient,grams\nflour,5000\nmozzarella,400\ntomato sauce,1000\npasta,2000\npesto,500\nmascarpone,0\nladyfingers,1000\n"
+            "ingredient,grams\ndough,14000\ntomato sauce,5000\nmozzarella,3200\nbasil,200\nspianata salami,1000\nonion,500\nnduja,600\ngreen chilli peppers,300\nlemon oil,150\nparsley,50\nspinach,400\ngrilled pepper,400\ngrilled courgette,400\ngorgonzola,200\nbalsamic glaze,200\nricotta salata,500\npecorino romano,300\n"
+        );
+        File.WriteAllText(
+            Path.Combine(Root, "suppliers.csv"),
+            "supplier,ingredient,pack_grams\nFresco,mozzarella,2500\nFresco,gorgonzola,1500\nDairy Dan,mozzarella,1000\nDairy Dan,gorgonzola,1000\n"
         );
         File.WriteAllText(Path.Combine(Root, "orders.csv"), "supplier,ingredient,grams\n");
     }

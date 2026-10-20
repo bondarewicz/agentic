@@ -24,7 +24,7 @@ Open `agentic.sln` in Rider to see both projects. Because the solution and the p
 | `parallel` | Workflow: parallelization | `Parallelization.cs` | `Task.WhenAll` for sectioning, a majority count for voting, then a senior reviewer call turns it all into a short ship-or-block verdict |
 | `orchestrator` | Workflow: orchestrator-workers | `OrchestratorWorkers.cs` | The model decides the subtasks; code fans them out and the model merges |
 | `evaluator` | Workflow: evaluator-optimizer | `EvaluatorOptimizer.cs` | Writes a commit message for a diff. Code checks the Conventional Commits format first, then Claude grades the judgement criteria, and the feedback loops back until it passes or hits the round limit |
-| `agent` | Agents | `Agent.cs` | Luigi's kitchen assistant: checks tonight's bookings against stock, orders what's missing with your approval, and works around a sold-out supplier until the stock check passes. Review the CSV files in the gitignored `workspace` folder |
+| `agent` | Agents | `Agent.cs` | Luigi's kitchen assistant: checks tonight's bookings against stock, orders what's missing in whole supplier packs with your approval, and works around a sold-out supplier until the stock check passes. Review the CSV files in the gitignored `workspace` folder |
 
 ## The shared helper
 
