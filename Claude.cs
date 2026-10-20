@@ -10,9 +10,33 @@ static class Claude
     static readonly AnthropicClient Client = new();
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    // shortcut: USD per million tokens copied from the October 2026 price list, update when pricing changes.
+    static readonly Dictionary<string, (decimal Input, decimal Output)> Prices = new() { [Opus] = (4m, 20m), [Haiku] = (0.10m, 0.50m) };
+    static readonly Lock Gate = new();
+    static int calls;
+    static long inputTokens, outputTokens;
+    static decimal cost;
+
+    public static string UsageSummary() =>
+        $"{calls} calls, {inputTokens:N0} input tokens, {outputTokens:N0} output tokens, about ${cost:F4}";
+
+    static async Task<Message> Create(string model, MessageCreateParams p)
+    {
+        var response = await Client.Messages.Create(p);
+        var (input, output) = (response.Usage.InputTokens, response.Usage.OutputTokens);
+        lock (Gate)
+        {
+            calls++;
+            inputTokens += input;
+            outputTokens += output;
+            cost += (input * Prices[model].Input + output * Prices[model].Output) / 1_000_000m;
+        }
+        return response;
+    }
+
     public static async Task<string> Ask(string prompt, string? system = null, string model = Opus)
     {
-        var response = await Client.Messages.Create(Params(prompt, system, model));
+        var response = await Create(model, Params(prompt, system, model));
         return Text(response);
     }
 
@@ -22,7 +46,7 @@ static class Claude
         {
             Schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.Serialize(schema))!,
         };
-        var response = await Client.Messages.Create(Params(prompt, null, Opus, new OutputConfig { Format = format }));
+        var response = await Create(Opus, Params(prompt, null, Opus, new OutputConfig { Format = format }));
         return JsonSerializer.Deserialize<T>(Text(response), Json)!;
     }
 
@@ -30,7 +54,7 @@ static class Claude
     {
         for (var step = 1; step <= maxSteps; step++)
         {
-            var response = await Client.Messages.Create(new MessageCreateParams
+            var response = await Create(Opus, new MessageCreateParams
             {
                 Model = Opus,
                 MaxTokens = 16000,

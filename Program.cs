@@ -24,7 +24,8 @@ if (pick.Run is null)
 }
 
 Console.WriteLine($"### {pick.What}\n");
-await pick.Run();
+try { await pick.Run(); }
+finally { Console.WriteLine($"\n{Claude.UsageSummary()}"); }
 return 0;
 
 static class DotEnv
