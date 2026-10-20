@@ -8,7 +8,7 @@ var examples = new (string Name, string What, Func<Task> Run)[]
 {
     (
         "augmented-llm",
-        "Building block: one LLM call with retrieval, tools and memory",
+        "Building block: an LLM with retrieval, tools and memory",
         AugmentedLlm.Run
     ),
     ("chaining", "Workflow: prompt chaining with a programmatic gate", PromptChaining.Run),
@@ -20,7 +20,7 @@ var examples = new (string Name, string What, Func<Task> Run)[]
         OrchestratorWorkers.Run
     ),
     ("evaluator", "Workflow: generate, evaluate, refine until it passes", EvaluatorOptimizer.Run),
-    ("agent", "Agent: tool loop over a sandboxed workspace with a human checkpoint", Agent.Run),
+    ("agent", "Agent: kitchen assistant that orders missing stock with your approval", Agent.Run),
 };
 
 var pick = examples.FirstOrDefault(e =>
